@@ -1,6 +1,5 @@
 #!/usr/bin/env perl6
 
-use v6;
 use File::Find;
 
 # This is the mapping we use to play a file
@@ -21,7 +20,7 @@ sub expand_songs($verbose, @songs) {
     if $song.IO ~~ :d {
       my @dirsongs;
       say "Adding all files in $song" if $verbose;
-      push @expanded_songs, find(:dir<<$song>>, :type<file>).sort;
+      push @expanded_songs, |find(:dir<<$song>>, :type<file>).sort;
     } else {
       say "Adding $song" if $verbose;
       push @expanded_songs, $song;
@@ -36,7 +35,7 @@ sub osd_song($song) {
   $saysong ~~ s/\..*?$//; # remove extension
   $saysong ~~ s/ \s \- \s/,\n/;
   say "notify-send '$saysong'";
-  # shell("notify-send '$saysong'");
+  shell("notify-send '$saysong'");
 }
 
 sub announce_song($song) {
@@ -52,13 +51,13 @@ sub announce_song($song) {
   $saysong ~~ s:g/\'//;
 
   say "say $saysong";
-  # shell("say '$saysong'");
+  shell("say '$saysong'");
 }
 
 sub playsong($song) {
   my $cmd = @play_commands.first({$song.match(.key)}).value;
   say "$cmd '$song'";
-  # shell("$cmd '$song'");
+  shell("$cmd '$song'");
 }
 
 # sub USAGE {
@@ -85,7 +84,7 @@ sub MAIN(
 
   @songs = expand_songs($verbose, @songs);
 
-  @songs.shift; # WHY do I have to do this?!
+  # @songs.shift; # WHY do I have to do this?!
 
   say "Playing {@songs.elems} songs";
   # say "songs: " ~ @songs.join("\n");
