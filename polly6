@@ -12,7 +12,7 @@ my @play_commands =
   /.*/                 => 'vlc', # fallback
 ;
 
-# subset File of Str where *.IO.e; # .IO returns an IO::Path object, and .e is for "exists"
+#| Recurse through the given "songs" expanding directories
 sub expand_songs($verbose, @songs) {
   my @expanded_songs = [];
 
@@ -29,6 +29,7 @@ sub expand_songs($verbose, @songs) {
   return @expanded_songs;
 }
 
+#| Format and display an on-screen announcement
 sub osd_song($song) {
   my $saysong = "$song";
   $saysong ~~ s/^.*\///;  # Strip out directory
@@ -38,6 +39,7 @@ sub osd_song($song) {
   shell("notify-send '$saysong'");
 }
 
+#| Make a song pronounceable and then send it to festival
 sub announce_song($song) {
   my $saysong = "$song";
   $saysong ~~ s/.*\///; # Strip out directory
@@ -50,33 +52,44 @@ sub announce_song($song) {
   $saysong ~~ s:g/\&/ and /;
   $saysong ~~ s:g/\'//;
 
-  say "say $saysong";
+  say "Announcing: $song";
   shell("say '$saysong'");
 }
 
-sub playsong($song) {
-  my $cmd = @play_commands.first({$song.match(.key)}).value;
-  say "$cmd '$song'";
-  shell("$cmd '$song'");
+my $last_sigint = now;
+
+signal(Signal::SIGINT).tap: {
+  exit if now - $last_sigint < 0.5;
+  $last_sigint = now;
+  say "\nSkipping to next song...";
 }
 
-# sub USAGE {
-#   say q:to[END];
-#     USAGE: polly6 [parameters] file1 dir1 ...
-#       -a: announce the current song (festival)
-#       -h: show this
-#       -o: On Screen Display of song title (osdctl)
-#       -s: force sort (dirs are already sorted)
-#       -v: be verbose
-#       -z: shuffle the file list
-#     END
-# }
+#| Play an individual song file, maybe hiding the output
+sub playsong($song, $quiet) {
+  my $cmd = @play_commands.first({$song.match(.key)}).value;
+  say "Playing via $cmd '$song'";
+  shell("$cmd '$song' {$quiet ?? '>/dev/null 2>&1' !! ''}");
+}
+
+sub USAGE {
+  say q:to[END];
+    USAGE: polly6 [parameters] file1 dir1 ...
+      -a: announce the current song (festival)
+      -h: show this usage info
+      -o: On Screen Display of song title (osdctl)
+      -s: force sort (dirs are already sorted)
+      -q: quiet the output of players
+      -v: be verbose
+      -z: shuffle the file list
+    END
+}
 
 sub MAIN(
   *@songs,
   Bool :a(:$announce) = False,
   Bool :o(:$osd)      = False,
   Bool :s(:$sort)     = False,
+  Bool :q(:$quiet)    = False,
   Bool :v(:$verbose)  = False,
   Bool :z(:$shuffle)  = False,
 ) {
@@ -84,20 +97,15 @@ sub MAIN(
 
   @songs = expand_songs($verbose, @songs);
 
-  # @songs.shift; # WHY do I have to do this?!
-
   say "Playing {@songs.elems} songs";
-  # say "songs: " ~ @songs.join("\n");
 
   @songs .= pick(*) if $shuffle;
   @songs .= sort    if $sort;
 
   for @songs -> $song {
-
+    osd_song($song)      if $osd;
     announce_song($song) if $announce;
-    osd_song($song) if $osd;
-    playsong($song);
-
+    playsong($song, $quiet);
   }
 }
 
